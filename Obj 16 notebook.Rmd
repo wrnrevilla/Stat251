@@ -1,0 +1,267 @@
+# Load Packages
+
+```{r}
+library(readxl)
+library(dplyr)
+library(car)
+library(heplots)
+library(MVN)
+library(biotools)
+library(ggplot2)
+library(GGally)
+```
+
+# Load Data
+
+```{r}
+file_path <- "C:/Users/William/Desktop/R code - Survey ops/Data for G10 Analysis.xlsx"
+
+obj16 <- read_excel(file_path, sheet = "obj16")
+
+names(obj16)
+```
+
+# Prepare Data
+
+```{r}
+g10_data <- obj16 %>%
+  dplyr::select(
+    Health_Deficit_Z,
+    LeisureSocial_Deficit_Z,
+    Household_Deficit_Z,
+    Productivity_Deficit_Z,
+    a1, a2, a3, b1, b3_count, g1, g2, g4, g6,
+    FA1, FA2, FA3, FA4, FA5, FA6
+  ) %>%
+  dplyr::mutate(
+    b3_count = ifelse(b3_count == 9999, 0, b3_count),
+    a2 = factor(a2),
+    a3 = factor(a3),
+    b1 = factor(b1),
+    g1 = factor(g1),
+    g2 = factor(g2),
+    g4 = factor(g4),
+    g6 = factor(g6)
+  )
+
+g10_complete <- na.omit(g10_data)
+
+nrow(g10_complete)
+```
+
+# Fit Model
+
+```{r}
+model <- lm(
+  cbind(
+    Health_Deficit_Z,
+    LeisureSocial_Deficit_Z,
+    Household_Deficit_Z,
+    Productivity_Deficit_Z
+  ) ~ a1 + a2 + a3 + b1 + b3_count + g1 + g2 + g4 + g6 +
+    FA1 + FA2 + FA3 + FA4 + FA5 + FA6,
+  data = g10_complete
+)
+
+summary(model)
+```
+
+# MANOVA Results
+
+```{r}
+manova_model <- manova(model)
+
+summary(manova_model, test = "Pillai")
+summary(manova_model, test = "Wilks")
+summary(manova_model, test = "Hotelling-Lawley")
+summary(manova_model, test = "Roy")
+```
+
+# Univariate ANOVA Results
+
+```{r}
+summary.aov(manova_model)
+```
+
+# Multicollinearity Test
+
+```{r}
+vif_model <- lm(
+  Health_Deficit_Z ~ a1 + a2 + a3 + b1 + b3_count + g1 + g2 + g4 + g6 +
+    FA1 + FA2 + FA3 + FA4 + FA5 + FA6,
+  data = g10_complete
+)
+
+vif_result <- vif(vif_model)
+vif_table <- as.data.frame(vif_result)
+
+if ("GVIF" %in% names(vif_table)) {
+  vif_table$Adjusted_GVIF <- vif_table$GVIF^(1 / (2 * vif_table$Df))
+}
+
+vif_table
+```
+
+# VIF Plot
+
+```{r}
+vif_plot_data <- vif_table
+vif_plot_data$Variable <- rownames(vif_plot_data)
+
+ggplot(vif_plot_data, aes(x = reorder(Variable, Adjusted_GVIF), y = Adjusted_GVIF)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Adjusted GVIF", x = "Variable", y = "Adjusted GVIF")
+```
+
+# Residuals
+
+```{r}
+resids <- as.data.frame(residuals(model))
+
+head(resids)
+```
+
+# Normality Tests
+
+```{r}
+mvn_result <- MVN::mvn(data = resids)
+
+mvn_result$multivariate_normality
+mvn_result$univariate_normality
+mvn_result$descriptives
+```
+
+# Q-Q Plots
+
+```{r}
+par(mfrow = c(2, 2))
+
+qqnorm(resids$Health_Deficit_Z, main = "Health Deficit")
+qqline(resids$Health_Deficit_Z)
+
+qqnorm(resids$LeisureSocial_Deficit_Z, main = "Leisure/Social Deficit")
+qqline(resids$LeisureSocial_Deficit_Z)
+
+qqnorm(resids$Household_Deficit_Z, main = "Household Deficit")
+qqline(resids$Household_Deficit_Z)
+
+qqnorm(resids$Productivity_Deficit_Z, main = "Productivity Deficit")
+qqline(resids$Productivity_Deficit_Z)
+
+par(mfrow = c(1, 1))
+```
+
+# Histograms
+
+```{r}
+hist(resids$Health_Deficit_Z, main = "Health Deficit Residuals", xlab = "Residuals")
+hist(resids$LeisureSocial_Deficit_Z, main = "Leisure/Social Deficit Residuals", xlab = "Residuals")
+hist(resids$Household_Deficit_Z, main = "Household Deficit Residuals", xlab = "Residuals")
+hist(resids$Productivity_Deficit_Z, main = "Productivity Deficit Residuals", xlab = "Residuals")
+```
+
+# Residual Boxplots
+
+```{r}
+boxplot(
+  resids$Health_Deficit_Z,
+  resids$LeisureSocial_Deficit_Z,
+  resids$Household_Deficit_Z,
+  resids$Productivity_Deficit_Z,
+  names = c("Health", "Leisure/Social", "Household", "Productivity"),
+  main = "Boxplots of Residuals",
+  ylab = "Residuals"
+)
+```
+
+# Box's M Test
+
+```{r}
+Y_boxm <- as.matrix(
+  g10_complete %>%
+    dplyr::select(
+      Health_Deficit_Z,
+      LeisureSocial_Deficit_Z,
+      Household_Deficit_Z,
+      Productivity_Deficit_Z
+    )
+)
+
+group_boxm <- droplevels(g10_complete$a2)
+
+boxm_result <- biotools::boxM(Y_boxm, group_boxm)
+
+boxm_result
+```
+
+# Mahalanobis Outlier Check
+
+```{r}
+mahal <- mahalanobis(
+  resids,
+  colMeans(resids),
+  cov(resids)
+)
+
+mahal_cutoff <- qchisq(0.999, df = 4)
+outliers <- which(mahal > mahal_cutoff)
+
+outlier_summary <- data.frame(
+  cutoff = mahal_cutoff,
+  number_of_outliers = length(outliers),
+  percent_outliers = length(outliers) / nrow(g10_complete) * 100,
+  max_mahalanobis = max(mahal),
+  mean_mahalanobis = mean(mahal)
+)
+
+outlier_summary
+outliers
+```
+
+# Mahalanobis Plot
+
+```{r}
+plot(mahal, main = "Mahalanobis Distance", ylab = "Distance", xlab = "Observation")
+abline(h = mahal_cutoff, lty = 2)
+```
+
+# Residuals vs Fitted
+
+```{r}
+fitted_values <- as.data.frame(fitted(model))
+
+par(mfrow = c(2, 2))
+
+plot(fitted_values$Health_Deficit_Z, resids$Health_Deficit_Z,
+     main = "Health", xlab = "Fitted", ylab = "Residuals")
+abline(h = 0, lty = 2)
+
+plot(fitted_values$LeisureSocial_Deficit_Z, resids$LeisureSocial_Deficit_Z,
+     main = "Leisure/Social", xlab = "Fitted", ylab = "Residuals")
+abline(h = 0, lty = 2)
+
+plot(fitted_values$Household_Deficit_Z, resids$Household_Deficit_Z,
+     main = "Household", xlab = "Fitted", ylab = "Residuals")
+abline(h = 0, lty = 2)
+
+plot(fitted_values$Productivity_Deficit_Z, resids$Productivity_Deficit_Z,
+     main = "Productivity", xlab = "Fitted", ylab = "Residuals")
+abline(h = 0, lty = 2)
+
+par(mfrow = c(1, 1))
+```
+
+# Pairwise Outcome Plot
+
+```{r}
+GGally::ggpairs(
+  g10_complete %>%
+    dplyr::select(
+      Health_Deficit_Z,
+      LeisureSocial_Deficit_Z,
+      Household_Deficit_Z,
+      Productivity_Deficit_Z
+    )
+)
+```
