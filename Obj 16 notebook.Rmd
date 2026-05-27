@@ -14,37 +14,26 @@ library(GGally)
 # Load Data
 
 ```{r}
-file_path <- "C:/Users/William/Desktop/R code - Survey ops/Data for G10 Analysis.xlsx"
+file_path <- "C:/Users/William/Desktop/R code - Survey ops/00 df_final_clean_assumption_ready.xlsx"
 
-obj16 <- read_excel(file_path, sheet = "obj16")
+df <- read_excel(file_path)
 
-names(obj16)
+names(df)
 ```
 
 # Prepare Data
 
 ```{r}
-g10_data <- obj16 %>%
-  dplyr::select(
-    Health_Deficit_Z,
-    LeisureSocial_Deficit_Z,
-    Household_Deficit_Z,
-    Productivity_Deficit_Z,
-    a1, a2, a3, b1, b3_count, g1, g2, g4, g6,
-    FA1, FA2, FA3, FA4, FA5, FA6
-  ) %>%
+g10_complete <- df %>%
   dplyr::mutate(
-    b3_count = ifelse(b3_count == 9999, 0, b3_count),
-    a2 = factor(a2),
-    a3 = factor(a3),
-    b1 = factor(b1),
     g1 = factor(g1),
     g2 = factor(g2),
+    a2 = factor(a2),
+    a3 = factor(a3),
     g4 = factor(g4),
     g6 = factor(g6)
-  )
-
-g10_complete <- na.omit(g10_data)
+  ) %>%
+  na.omit()
 
 nrow(g10_complete)
 ```
@@ -54,12 +43,24 @@ nrow(g10_complete)
 ```{r}
 model <- lm(
   cbind(
-    Health_Deficit_Z,
-    LeisureSocial_Deficit_Z,
-    Household_Deficit_Z,
-    Productivity_Deficit_Z
-  ) ~ a1 + a2 + a3 + b1 + b3_count + g1 + g2 + g4 + g6 +
-    FA1 + FA2 + FA3 + FA4 + FA5 + FA6,
+    health_deficit_z,
+    leisure_social_deficit_z,
+    household_deficit_z,
+    productivity_deficit_z
+  ) ~
+    fa1_scaled +
+    fa2_scaled +
+    fa3_scaled +
+    fa4_scaled +
+    fa5_scaled +
+    fa6_scaled +
+    g1 +
+    a1 +
+    g6 +
+    g2 +
+    a2 +
+    a3 +
+    g4,
   data = g10_complete
 )
 
@@ -87,8 +88,20 @@ summary.aov(manova_model)
 
 ```{r}
 vif_model <- lm(
-  Health_Deficit_Z ~ a1 + a2 + a3 + b1 + b3_count + g1 + g2 + g4 + g6 +
-    FA1 + FA2 + FA3 + FA4 + FA5 + FA6,
+  health_deficit_z ~
+    fa1_scaled +
+    fa2_scaled +
+    fa3_scaled +
+    fa4_scaled +
+    fa5_scaled +
+    fa6_scaled +
+    g1 +
+    a1 +
+    g6 +
+    g2 +
+    a2 +
+    a3 +
+    g4,
   data = g10_complete
 )
 
@@ -137,17 +150,17 @@ mvn_result$descriptives
 ```{r}
 par(mfrow = c(2, 2))
 
-qqnorm(resids$Health_Deficit_Z, main = "Health Deficit")
-qqline(resids$Health_Deficit_Z)
+qqnorm(resids$health_deficit_z, main = "Health Deficit")
+qqline(resids$health_deficit_z)
 
-qqnorm(resids$LeisureSocial_Deficit_Z, main = "Leisure/Social Deficit")
-qqline(resids$LeisureSocial_Deficit_Z)
+qqnorm(resids$leisure_social_deficit_z, main = "Leisure/Social Deficit")
+qqline(resids$leisure_social_deficit_z)
 
-qqnorm(resids$Household_Deficit_Z, main = "Household Deficit")
-qqline(resids$Household_Deficit_Z)
+qqnorm(resids$household_deficit_z, main = "Household Deficit")
+qqline(resids$household_deficit_z)
 
-qqnorm(resids$Productivity_Deficit_Z, main = "Productivity Deficit")
-qqline(resids$Productivity_Deficit_Z)
+qqnorm(resids$productivity_deficit_z, main = "Productivity Deficit")
+qqline(resids$productivity_deficit_z)
 
 par(mfrow = c(1, 1))
 ```
@@ -155,20 +168,20 @@ par(mfrow = c(1, 1))
 # Histograms
 
 ```{r}
-hist(resids$Health_Deficit_Z, main = "Health Deficit Residuals", xlab = "Residuals")
-hist(resids$LeisureSocial_Deficit_Z, main = "Leisure/Social Deficit Residuals", xlab = "Residuals")
-hist(resids$Household_Deficit_Z, main = "Household Deficit Residuals", xlab = "Residuals")
-hist(resids$Productivity_Deficit_Z, main = "Productivity Deficit Residuals", xlab = "Residuals")
+hist(resids$health_deficit_z, main = "Health Deficit Residuals", xlab = "Residuals")
+hist(resids$leisure_social_deficit_z, main = "Leisure/Social Deficit Residuals", xlab = "Residuals")
+hist(resids$household_deficit_z, main = "Household Deficit Residuals", xlab = "Residuals")
+hist(resids$productivity_deficit_z, main = "Productivity Deficit Residuals", xlab = "Residuals")
 ```
 
 # Residual Boxplots
 
 ```{r}
 boxplot(
-  resids$Health_Deficit_Z,
-  resids$LeisureSocial_Deficit_Z,
-  resids$Household_Deficit_Z,
-  resids$Productivity_Deficit_Z,
+  resids$health_deficit_z,
+  resids$leisure_social_deficit_z,
+  resids$household_deficit_z,
+  resids$productivity_deficit_z,
   names = c("Health", "Leisure/Social", "Household", "Productivity"),
   main = "Boxplots of Residuals",
   ylab = "Residuals"
@@ -181,10 +194,10 @@ boxplot(
 Y_boxm <- as.matrix(
   g10_complete %>%
     dplyr::select(
-      Health_Deficit_Z,
-      LeisureSocial_Deficit_Z,
-      Household_Deficit_Z,
-      Productivity_Deficit_Z
+      health_deficit_z,
+      leisure_social_deficit_z,
+      household_deficit_z,
+      productivity_deficit_z
     )
 )
 
@@ -233,19 +246,19 @@ fitted_values <- as.data.frame(fitted(model))
 
 par(mfrow = c(2, 2))
 
-plot(fitted_values$Health_Deficit_Z, resids$Health_Deficit_Z,
+plot(fitted_values$health_deficit_z, resids$health_deficit_z,
      main = "Health", xlab = "Fitted", ylab = "Residuals")
 abline(h = 0, lty = 2)
 
-plot(fitted_values$LeisureSocial_Deficit_Z, resids$LeisureSocial_Deficit_Z,
+plot(fitted_values$leisure_social_deficit_z, resids$leisure_social_deficit_z,
      main = "Leisure/Social", xlab = "Fitted", ylab = "Residuals")
 abline(h = 0, lty = 2)
 
-plot(fitted_values$Household_Deficit_Z, resids$Household_Deficit_Z,
+plot(fitted_values$household_deficit_z, resids$household_deficit_z,
      main = "Household", xlab = "Fitted", ylab = "Residuals")
 abline(h = 0, lty = 2)
 
-plot(fitted_values$Productivity_Deficit_Z, resids$Productivity_Deficit_Z,
+plot(fitted_values$productivity_deficit_z, resids$productivity_deficit_z,
      main = "Productivity", xlab = "Fitted", ylab = "Residuals")
 abline(h = 0, lty = 2)
 
@@ -258,10 +271,10 @@ par(mfrow = c(1, 1))
 GGally::ggpairs(
   g10_complete %>%
     dplyr::select(
-      Health_Deficit_Z,
-      LeisureSocial_Deficit_Z,
-      Household_Deficit_Z,
-      Productivity_Deficit_Z
+      health_deficit_z,
+      leisure_social_deficit_z,
+      household_deficit_z,
+      productivity_deficit_z
     )
 )
 ```
